@@ -11,10 +11,12 @@ namespace DownloadApi.Controllers;
 
 public class UploadController : ControllerBase
 {
-    public readonly string _targetFilePath;
+    public readonly string _targetFilePathPdf;
+    public readonly string _targetFilePathDocx;
 
     public UploadController(IWebHostEnvironment env) {
-        _targetFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/files");
+        _targetFilePathDocx = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/files/Docx");
+        _targetFilePathPdf = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/files/Pdf");
     }
 
     [HttpPost("upload")]
@@ -25,17 +27,29 @@ public class UploadController : ControllerBase
         else
             Console.WriteLine("file droped");
 
-        var AllowedExtentions = new[] {".pptx", ".pdf", ".jpg", ".docx"};
+        var AllowedExtentions = new[] {".pdf", ".docx"};
         var extention = Path.GetExtension(file.FileName).ToLowerInvariant();
 
         if(!AllowedExtentions.Contains(extention)) 
             return BadRequest("Unsuported extention");
         
 
-        var path = Path.Combine(_targetFilePath, file.FileName);
+        var path = extention switch {
+            ".docx" => Path.Combine(_targetFilePathDocx, file.FileName),
+            ".pdf" => Path.Combine(_targetFilePathPdf, file.FileName),
+            _ => null
+        };
 
-        if(!Directory.Exists(_targetFilePath)) {
-            Directory.CreateDirectory(_targetFilePath);
+        if(path == null) 
+            return BadRequest("invalid file path");
+
+        var directoryPath = Path.GetDirectoryName(path);
+
+        if(directoryPath == null) 
+            return StatusCode(StatusCodes.Status500InternalServerError, "Invalid directory path");
+
+        if(!Directory.Exists(path)) {
+           Directory.CreateDirectory(directoryPath);
         }
 
         using(var stream = new FileStream(path, FileMode.Create)) {
@@ -47,8 +61,10 @@ public class UploadController : ControllerBase
 
     [HttpGet("files")]
     public IActionResult GetFiles() {
-        var path = _targetFilePath;
-        var files = Directory.GetFiles(path).Select(f => Path.GetFileName(f)).ToList();
+        var docxFiles = Directory.GetFiles(_targetFilePathDocx).Select(f => Path.GetFileName(f));
+        var pdfFiles = Directory.GetFiles(_targetFilePathPdf).Select(f => Path.GetFileName(f));
+
+        var files = docxFiles.Concat(pdfFiles).ToList();
 
         return Ok(files);
     }

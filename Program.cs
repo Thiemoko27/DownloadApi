@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.FileProviders;
 
 namespace DownloadApi
 {
@@ -7,6 +12,10 @@ namespace DownloadApi
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.WebHost.ConfigureKestrel(serverOptions => {
+                serverOptions.Limits.MaxRequestBodySize = 100_000_000; // 100 Mo
+            });
+
             // Add services to the container.
 
             builder.Services.AddCors(options => {
@@ -14,6 +23,10 @@ namespace DownloadApi
                         builder => builder.WithOrigins("http://localhost:5173")
                                            .AllowAnyHeader()
                                            .AllowAnyMethod());
+            });
+
+            builder.Services.Configure<FormOptions>(options => {
+                options.MultipartBodyLengthLimit = 100_000_000; // 150 Mo
             });
 
             builder.Services.AddControllers();
@@ -41,6 +54,12 @@ namespace DownloadApi
             if(!Directory.Exists(filePath)) {
                 Directory.CreateDirectory(filePath);
             }
+
+            app.UseStaticFiles(new StaticFileOptions {
+                FileProvider = new PhysicalFileProvider(
+                    Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "files")),
+                RequestPath = "/files"
+            });
 
             app.UseCors("AllowSpecificOrigin");
 
